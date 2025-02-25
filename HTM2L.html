@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Magic Ovad Jump Master</title>
+    <style>
+        :root {
+            --bg-color1: #87CEEB;
+            --bg-color2: #4682B4;
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f0f0f0;
+            margin: 0;
+            font-family: 'Arial', sans-serif;
+            touch-action: manipulation;
+        }
+
+        #game-container {
+            position: relative;
+            width: 400px;
+            height: 600px;
+            overflow: hidden;
+            border: 3px solid #333;
+            margin-top: 20px;
+            background: linear-gradient(to bottom, var(--bg-color1) 50%, var(--bg-color2) 100%);
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.2);
+            transition: background 1s ease;
+        }
+
+        #character {
+            position: absolute;
+            background-image: url('https://ibb.co/M538T6hC');
+            background-size: cover;
+            width: 60px;
+            height: 60px;
+            transition: transform 0.2s, background-image 0.3s;
+            box-shadow: 0px 0px 0px;
+            z-index: 2;
+        }
+
+        .jump {
+            transform: scale(1.1) rotate(-10deg);
+        }
+
+        #character.facing-left {
+            transform: scaleX(-1);
+        }
+
+        .platform {
+            position: absolute;
+            background-color: #4CAF50;
+            border-radius: 10px;
+            height: 15px;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+            transition: transform 0.3s;
+        }
+
+        .platform.moving {
+            background-color: #FF5722;
+            animation: glow 1s infinite alternate;
+        }
+
+        .mushroom {
+            position: absolute;
+            background: url('https://ibb.co/k295dGdG');
+            background-size: contain;
+            width: 30px;
+            height: 30px;            
+            bottom: 25px;
+            left: 50%;
+            transform: translateX(-50%);
+            animation: float 2s ease-in-out infinite;
+            z-index: 3;
+        }
+
+        @keyframes glow {
+            from { box-shadow: 0 0 5px #FF5722; }
+            to { box-shadow: 0 0 15px #FF5722; }
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(-50%, 0); }
+            50% { transform: translate(-50%, -5px); }
+        }
+
+        @keyframes floatUp {
+            0% { transform: translateY(0); opacity: 1; }
+            100% { transform: translateY(-50px); opacity: 0; }
+        }
+
+        #score-board {
+            display: flex;
+            gap: 20px;
+            margin: 15px;
+        }
+
+        .score-item {
+            font-size: 28px;
+            color: #333;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px white;
+        }
+
+        #mobile-controls {
+            display: none;
+            gap: 25px;
+            margin: 20px 0;
+            z-index: 3;
+        }
+
+        #mobile-controls button {
+            padding: 25px;
+            font-size: 28px;
+            border: none;
+            border-radius: 20px;
+            background-color: #666;
+            color: white;
+            touch-action: manipulation;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+        }
+
+        #game-over {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.95);
+            color: white;
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            display: none;
+            z-index: 4;
+            width: 80%;
+            max-width: 300px;
+        }
+
+        #restart-btn {
+            background: #4CAF50;
+            border: none;
+            padding: 15px 30px;
+            color: white;
+            border-radius: 10px;
+            cursor: pointer;
+            margin-top: 20px;
+            font-size: 20px;
+            transition: transform 0.2s;
+        }
+
+        #level-up {
+            position: absolute;
+            top: 20%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 215, 0, 0.9);
+            color: #333;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 24px;
+            display: none;
+            z-index: 5;
+            animation: levelUp 1s ease;
+        }
+
+        @keyframes levelUp {
+            0% { transform: translateX(-50%) scale(0); }
+            50% { transform: translateX(-50%) scale(1.2); }
+            100% { transform: translateX(-50%) scale(1); }
+        }
+
+        @media (max-width: 600px) {
+            #game-container {
+                width: 95%;
+                height: 70vh;
+                margin-top: 10px;
+            }
+            #mobile-controls {
+                display: flex;
+                margin: 10px 0;
+            }
+            .score-item {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Элементы для звуков -->
+    <audio id="jump-sound" src="audio/fly1.mp3"></audio>
+    <audio id="mushroom-sound" src="audio/eat.mp3"></audio>
+
+    <div id="score-board">
+        <div class="score-item">Score: <span id="score">0</span></div>
+        <div class="score-item">Level: <span id="level">1</span></div>
+    </div>
+    <div id="game-container">
+        <div id="character"></div>
+        <div id="game-over">
+            <h2 style="margin: 0 0 15px 0;">Game Over!</h2>
+            <p style="font-size: 24px;">Score: <span id="final-score">0</span></p>
+            <p style="font-size: 18px;">Max Level: <span id="final-level">1</span></p>
+            <button id="restart-btn">Play Again</button>
+        </div>
+        <div id="level-up">Level Up!</div>
+    </div>
+    <div id="mobile-controls">
+        <button id="left">←</button>
+        <button id="jump">↑</button>
+        <button id="right">→</button>
+    </div>
+
+    <script>
+        let animationFrameId;
+        const gameContainer = document.getElementById('game-container');
+        const character = document.getElementById('character');
+        const scoreElement = document.getElementById('score');
+        const levelElement = document.getElementById('level');
+        const gameOverScreen = document.getElementById('game-over');
+        const finalScoreElement = document.getElementById('final-score');
+        const finalLevelElement = document.getElementById('final-level');
+        const restartBtn = document.getElementById('restart-btn');
+        const levelUpAlert = document.getElementById('level-up');
+        const jumpSound = document.getElementById('jump-sound');
+        const mushroomSound = document.getElementById('mushroom-sound');
+        
+        let platforms = [];
+        let cameraY = 0;
+        let x, y, vy, score, level, maxLevel;
+        let isGameOver = false;
+        let keys = { left: false, right: false };
+        let jumpCount = 0;
+        
+        const baseSettings = {
+            gravity: 0.7,
+            jumpStrength: 14,
+            moveSpeed: 5,
+            platformGap: 220,
+            platformWidth: [70, 130],
+            cameraOffset: 200,
+            movingPlatformChance: 0.3,
+            movingPlatformSpeed: 3,
+            maxMovingPlatformSpeed: 7,
+            mushroomChance: 0.2
+        };
+
+        let currentSettings = {...baseSettings};
+
+        const levelColors = [
+            [ '#87CEEB', '#4682B4' ],
+            [ '#FFB6C1', '#FF69B4' ],
+            [ '#98FB98', '#3CB371' ],
+            [ '#DDA0DD', '#9400D3' ],
+            [ '#FFA07A', '#FF4500' ]
+        ];
+
+        function initGame() {
+            cancelAnimationFrame(animationFrameId);
+            
+            platforms.forEach(p => {
+                p.element.remove();
+                if(p.mushroomElement) p.mushroomElement.remove();
+            });
+            platforms = [];
+            
+            cameraY = 0;
+            x = gameContainer.offsetWidth/2 - 15;
+            y = 15;
+            vy = 0;
+            score = 0;
+            level = 1;
+            maxLevel = 1;
+            isGameOver = false;
+            keys = { left: false, right: false };
+            jumpCount = 0;
+            currentSettings = {...baseSettings};
+            
+            createPlatform(gameContainer.offsetWidth/2 - 60, 0, 120);
+            generateInitialPlatforms();
+            
+            gameOverScreen.style.display = 'none';
+            scoreElement.textContent = '0';
+            levelElement.textContent = '1';
+            character.style.transform = 'scale(1)';
+            updateBackground();
+            
+            character.style.left = x + 'px';
+            character.style.bottom = y + 'px';
+        }
+
+        function createPlatform(left, bottom, width, isMoving = false) {
+            const platform = document.createElement('div');
+            platform.className = `platform${isMoving ? ' moving' : ''}`;
+            platform.style.left = left + 'px';
+            platform.style.bottom = (bottom - cameraY) + 'px';
+            platform.style.width = width + 'px';
+            gameContainer.appendChild(platform);
+            
+            const platformData = {
+                element: platform,
+                left: left,
+                bottom: bottom,
+                width: width,
+                height: 15,
+                isMoving: isMoving,
+                direction: isMoving ? (Math.random() < 0.5 ? -1 : 1) : 0,
+                speed: isMoving ? currentSettings.movingPlatformSpeed : 0,
+                hasMushroom: false,
+                mushroomElement: null
+            };
+
+            if(Math.random() < currentSettings.mushroomChance) {
+                const mushroom = document.createElement('div');
+                mushroom.className = 'mushroom';
+                platform.appendChild(mushroom);
+                platformData.hasMushroom = true;
+                platformData.mushroomElement = mushroom;
+            }
+
+            platforms.push(platformData);
+            return platformData;
+        }
+
+        function generateInitialPlatforms() {
+            let currentY = 0;
+            for(let i = 0; i < 5; i++) {
+                currentY += currentSettings.platformGap;
+                const isMoving = Math.random() < currentSettings.movingPlatformChance;
+                createPlatform(
+                    Math.random() * (gameContainer.offsetWidth - 100),
+                    currentY,
+                    Math.random() * (currentSettings.platformWidth[1] - currentSettings.platformWidth[0]) + currentSettings.platformWidth[0],
+                    isMoving
+                );
+            }
+        }
+
+        function updateMovingPlatforms() {
+            platforms.forEach(platform => {
+                if(platform.isMoving) {
+                    platform.left += platform.direction * platform.speed;
+                    
+                    if(platform.left < 0) {
+                        platform.left = 0;
+                        platform.direction *= -1;
+                    }
+                    if(platform.left + platform.width > gameContainer.offsetWidth) {
+                        platform.left = gameContainer.offsetWidth - platform.width;
+                        platform.direction *= -1;
+                    }
+                    
+                    platform.element.style.left = platform.left + 'px';
+                }
+            });
+        }
+
+        function checkMushroomCollision(platform) {
+            if(platform.hasMushroom && platform.mushroomElement) {
+                const mushroomRect = platform.mushroomElement.getBoundingClientRect();
+                const characterRect = character.getBoundingClientRect();
+
+                const collision = !(
+                    characterRect.right < mushroomRect.left || 
+                    characterRect.left > mushroomRect.right || 
+                    characterRect.bottom < mushroomRect.top || 
+                    characterRect.top > mushroomRect.bottom
+                );
+
+                if(collision) {
+                    // Воспроизведение звука гриба
+                    mushroomSound.currentTime = 0;
+                    mushroomSound.play().catch(error => {
+                        console.log('Звук гриба не может быть воспроизведён:', error);
+                    });
+
+                    score += 500;
+                    platform.hasMushroom = false;
+                    platform.mushroomElement.remove();
+                    scoreElement.textContent = score;
+                    
+                    const feedback = document.createElement('div');
+                    feedback.textContent = '+500';
+                    feedback.style.position = 'fixed';
+                    feedback.style.color = '#00ff00';
+                    feedback.style.left = `${mushroomRect.left}px`;
+                    feedback.style.top = `${mushroomRect.top}px`;
+                    feedback.style.fontSize = '20px';
+                    feedback.style.fontWeight = 'bold';
+                    feedback.style.animation = 'floatUp 1s ease-out';
+                    document.body.appendChild(feedback);
+                    
+                    setTimeout(() => feedback.remove(), 1000);
+                }
+            }
+        }
+
+        function checkLevelUp() {
+            const neededScore = level * 5000;
+            if(score >= neededScore) {
+                level++;
+                maxLevel = Math.max(level, maxLevel);
+                levelElement.textContent = level;
+                
+                currentSettings.gravity *= 1.1;
+                currentSettings.jumpStrength *= 1.05;
+                currentSettings.moveSpeed *= 1.05;
+                currentSettings.platformGap *= 0.95;
+                currentSettings.movingPlatformChance = Math.min(0.6, currentSettings.movingPlatformChance + 0.05);
+                currentSettings.movingPlatformSpeed = Math.min(
+                    currentSettings.maxMovingPlatformSpeed,
+                    currentSettings.movingPlatformSpeed * 1.05
+                );
+                
+                updateBackground();
+                showLevelUp();
+            }
+        }
+
+        function updateBackground() {
+            const colorIndex = (level - 1) % levelColors.length;
+            gameContainer.style.setProperty('--bg-color1', levelColors[colorIndex][0]);
+            gameContainer.style.setProperty('--bg-color2', levelColors[colorIndex][1]);
+        }
+
+        function showLevelUp() {
+            levelUpAlert.style.display = 'block';
+            setTimeout(() => {
+                levelUpAlert.style.display = 'none';
+            }, 2000);
+        }
+
+        function updateCamera() {
+            const targetCameraY = y - currentSettings.cameraOffset;
+            if(targetCameraY > cameraY) {
+                cameraY = targetCameraY;
+            }
+            
+            platforms.forEach(platform => {
+                platform.element.style.bottom = (platform.bottom - cameraY) + 'px';
+            });
+        }
+
+        function generateNewPlatforms() {
+            const highestPlatform = platforms.reduce((max, p) => Math.max(max, p.bottom), 0);
+            if(highestPlatform < cameraY + gameContainer.offsetHeight * 2) {
+                for(let i = 0; i < 3; i++) {
+                    const isMoving = Math.random() < currentSettings.movingPlatformChance;
+                    const width = Math.random() * (currentSettings.platformWidth[1] - currentSettings.platformWidth[0]) + currentSettings.platformWidth[0];
+                    const left = Math.random() * (gameContainer.offsetWidth - width);
+                    
+                    createPlatform(
+                        left,
+                        highestPlatform + currentSettings.platformGap * (i + 1),
+                        width,
+                        isMoving
+                    );
+                }
+            }
+        }
+
+        function checkCollisions() {
+            let onPlatform = false;
+            platforms.forEach(platform => {
+                const platformY = platform.bottom - cameraY;
+                const platformRight = platform.left + platform.width;
+                
+                if(y <= platform.bottom + platform.height &&
+                   y + 30 >= platform.bottom &&
+                   x + 30 > platform.left &&
+                   x < platformRight &&
+                   vy <= 0) {
+                    
+                    if(platform.isMoving) {
+                        x += platform.direction * platform.speed * 0.5;
+                        x = Math.max(0, Math.min(x, gameContainer.offsetWidth - 30));
+                    }
+                    
+                    vy = 0;
+                    y = platform.bottom + platform.height;
+                    jumpCount = 0;
+                    onPlatform = true;
+                }
+                
+                checkMushroomCollision(platform);
+            });
+            return onPlatform;
+        }
+
+        function handleJump() {
+            if(isGameOver || jumpCount >= 2) return;
+            
+            // Воспроизведение звука прыжка
+            jumpSound.currentTime = 0;
+            jumpSound.play().catch(error => {
+                console.log('Звук прыжка не может быть воспроизведён:', error);
+            });
+            
+            vy = currentSettings.jumpStrength;
+            jumpCount++;
+            character.style.transform = 'scale(1.2)';
+            setTimeout(() => character.style.transform = 'scale(1)', 200);
+        }
+
+        function showGameOver() {
+            isGameOver = true;
+            gameOverScreen.style.display = 'block';
+            finalScoreElement.textContent = score;
+            finalLevelElement.textContent = maxLevel;
+        }
+
+        function gameLoop() {
+            if(isGameOver) return;
+            
+            updateMovingPlatforms();
+            
+            if(keys.left) x -= currentSettings.moveSpeed;
+            if(keys.right) x += currentSettings.moveSpeed;
+            x = Math.max(0, Math.min(x, gameContainer.offsetWidth - 30));
+            
+            vy -= currentSettings.gravity;
+            y += vy;
+            
+            const onPlatform = checkCollisions();
+            
+            updateCamera();
+            generateNewPlatforms();
+            
+            platforms = platforms.filter(platform => {
+                if(platform.bottom < cameraY - gameContainer.offsetHeight) {
+                    platform.element.remove();
+                    if(platform.mushroomElement) platform.mushroomElement.remove();
+                    return false;
+                }
+                return true;
+            });
+
+            score = Math.floor(cameraY);
+            scoreElement.textContent = score;
+            
+            checkLevelUp();
+
+            if(y < cameraY - 100) {
+                showGameOver();
+            }
+
+            character.style.left = x + 'px';
+            character.style.bottom = (y - cameraY) + 'px';
+
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if(isGameOver) return;
+            if(e.key === 'ArrowLeft') keys.left = true;
+            if(e.key === 'ArrowRight') keys.right = true;
+            if(e.key === ' ') handleJump();
+        });
+        
+        document.addEventListener('keyup', (e) => {
+            if(e.key === 'ArrowLeft') keys.left = false;
+            if(e.key === 'ArrowRight') keys.right = false;
+        });
+
+        ['left', 'jump', 'right'].forEach(id => {
+            const btn = document.getElementById(id);
+            btn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                if(id === 'jump') handleJump();
+                else keys[id] = true;
+            });
+            btn.addEventListener('touchend', (e) => {
+                if(id !== 'jump') keys[id] = false;
+            });
+        });
+
+        restartBtn.addEventListener('click', () => {
+            initGame();
+            gameLoop();
+        });
+
+        initGame();
+        gameLoop();
+    </script>
+</body>
+</html>
